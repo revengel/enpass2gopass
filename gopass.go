@@ -156,11 +156,12 @@ func gopassSecretAddYamlData(data, k, v string) string {
 
 func getGopassItemSecrets(prefix string, item DataItem) (map[string]gopass.Byter, error) {
 	var (
-		err    error
-		data   string
-		o      = make(map[string]gopass.Byter)
-		s      = secrets.NewAKV()
-		folder = item.GetFirstFolder()
+		err          error
+		data         string
+		o            = make(map[string]gopass.Byter)
+		s            = secrets.NewAKV()
+		folder       = item.GetFirstFolder()
+		passwordsMap = make(map[string]string)
 	)
 
 	gopassPath, err := getGopassPath(prefix, folder, item)
@@ -205,13 +206,20 @@ func getGopassItemSecrets(prefix string, item DataItem) (map[string]gopass.Byter
 			continue
 		}
 
-		if s.Password() == "" && field.CheckType("password") {
+		// get field label
+		var labelName = field.GetLabel()
+
+		// save all passwords to map
+		if field.CheckType("password") {
 			passwd := field.GetValue()
-			s.SetPassword(passwd)
+			if s.Password() == "" {
+				s.SetPassword(passwd)
+			}
+
+			passwordsMap[labelName] = passwd
 			continue
 		}
 
-		var labelName = field.GetLabel()
 		if field.CheckType("totp") {
 			labelName = "totp"
 		}
@@ -228,6 +236,16 @@ func getGopassItemSecrets(prefix string, item DataItem) (map[string]gopass.Byter
 		err = gopassSecretSet(s, labelName, field.GetValue(), field.IsMultiline())
 		if err != nil {
 			return o, err
+		}
+	}
+
+	// if passwords count is more than 1 - add it all as fields
+	if len(passwordsMap) > 1 {
+		for k, v := range passwordsMap {
+			err = gopassSecretSet(s, k, v, false)
+			if err != nil {
+				return o, err
+			}
 		}
 	}
 
