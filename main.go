@@ -10,6 +10,7 @@ import (
 	"os/signal"
 
 	"github.com/revengel/enpass2gopass/enpass"
+	"github.com/revengel/enpass2gopass/gopassstore"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -33,7 +34,7 @@ func main() {
 		prefix        string
 		logLevel      string
 		dryrun, debug bool
-		gp            *Gopass
+		gp            *gopassstore.Gopass
 		err           error
 	)
 
@@ -69,7 +70,7 @@ func main() {
 		}
 	}()
 
-	gp, err = newGopass(ctx)
+	gp, err = gopassstore.NewGopass(ctx)
 	if err != nil {
 		log.Fatalf("Failed to connect gopass: %s", err)
 	}
@@ -113,7 +114,7 @@ func main() {
 	}
 
 	var lc = log.WithField("type", "cleaner")
-	ll, err := gp.list(`^` + prefix + `/`)
+	ll, err := gp.List(`^` + prefix + `/`)
 	if err != nil {
 		lc.WithError(err).Fatal("cannot get gopass keys list")
 	}
@@ -125,7 +126,7 @@ func main() {
 
 		var lck = lc.WithField("gopassPath", k)
 		lck.Info("gopass key will be deleted")
-		err = gp.remove(k)
+		err = gp.Remove(k)
 		if err != nil {
 			lck.Fatal("cannot delete gopass key")
 		}

@@ -1,37 +1,12 @@
 package main
 
 import (
-	"crypto/sha256"
 	"errors"
-	"fmt"
 	"path/filepath"
-	"strings"
 
 	"github.com/revengel/enpass2gopass/enpass"
 	log "github.com/sirupsen/logrus"
 )
-
-func getHashFromBytes(in []byte) string {
-	h := sha256.New()
-	h.Write(in)
-	return fmt.Sprintf("%x", h.Sum(nil))
-}
-
-func getHash(in string) string {
-	return getHashFromBytes([]byte(in))
-}
-
-func truncStr(in string, maxLen int) string {
-	if len(in) <= maxLen {
-		return in
-	}
-	return strings.TrimSuffix(in[:maxLen], "_")
-}
-
-func indent(spaces int, v string) string {
-	pad := strings.Repeat(" ", spaces)
-	return pad + strings.Replace(v, "\n", "\n"+pad, -1)
-}
 
 func setLogLevel(level string, debug bool) (err error) {
 	if debug {

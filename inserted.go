@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/revengel/enpass2gopass/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -19,7 +20,7 @@ func (i *InsertedPaths) Register(p string) {
 	defer i.Unlock()
 
 	var val uint64 = 1
-	var hash = getHash(p)
+	var hash = utils.GetHash(p)
 	if v, ok := i.data[hash]; ok {
 		val = v + 1
 	}
@@ -31,7 +32,7 @@ func (i *InsertedPaths) Check(p string) uint64 {
 	i.Lock()
 	defer i.Unlock()
 
-	var hash = getHash(p)
+	var hash = utils.GetHash(p)
 	if v, ok := i.data[hash]; ok {
 		return v
 	}
