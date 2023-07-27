@@ -9,12 +9,13 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/revengel/enpass2gopass/enpass"
 	log "github.com/sirupsen/logrus"
 )
 
 var (
 	insertedPaths = newInsertedPaths()
-	foldersMap    FoldersMap
+	foldersMap    enpass.FoldersMap
 )
 
 func init() {
@@ -75,7 +76,7 @@ func main() {
 
 	defer gp.Close()
 
-	data, err := loadData(values[0])
+	data, err := enpass.LoadData(values[0])
 	if err != nil {
 		log.Fatalf("Cannot load data from json file: %s", err.Error())
 	}

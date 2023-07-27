@@ -8,6 +8,7 @@ import (
 	"github.com/gopasspw/gopass/pkg/gopass"
 	"github.com/gopasspw/gopass/pkg/gopass/api"
 	"github.com/gopasspw/gopass/pkg/gopass/secrets"
+	"github.com/revengel/enpass2gopass/enpass"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -154,13 +155,13 @@ func gopassSecretAddYamlData(data, k, v string) string {
 	return data
 }
 
-func getGopassItemSecrets(prefix string, item DataItem) (map[string]gopass.Byter, error) {
+func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]gopass.Byter, error) {
 	var (
 		err    error
 		data   string
 		o      = make(map[string]gopass.Byter)
 		s      = secrets.NewAKV()
-		folder = item.GetFirstFolder()
+		folder = item.GetFirstFolder(foldersMap)
 	)
 
 	gopassPath, err := getGopassPath(prefix, folder, item)
@@ -190,7 +191,7 @@ func getGopassItemSecrets(prefix string, item DataItem) (map[string]gopass.Byter
 
 	data = gopassSecretAddYamlData(data, "note", item.GetNote())
 
-	err = gopassSecretSet(s, "tags", item.GetFoldersStr(), false)
+	err = gopassSecretSet(s, "tags", item.GetFoldersStr(foldersMap), false)
 	if err != nil {
 		return o, err
 	}
@@ -270,7 +271,7 @@ func getGopassItemSecrets(prefix string, item DataItem) (map[string]gopass.Byter
 	return o, err
 }
 
-func getGopassItemAttachSecret(attach Attachment) (o gopass.Byter, err error) {
+func getGopassItemAttachSecret(attach enpass.Attachment) (o gopass.Byter, err error) {
 	var dataB64 = attach.GetDataBase64Encoded()
 	var s = secrets.NewAKV()
 

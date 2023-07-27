@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/revengel/enpass2gopass/enpass"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -47,7 +48,7 @@ func setLogLevel(level string, debug bool) (err error) {
 	return
 }
 
-func getGopassPath(prefix, folder string, item DataItem) (out string, err error) {
+func getGopassPath(prefix, folder string, item enpass.DataItem) (out string, err error) {
 	out = prefix
 	switch {
 	case item.IsTrashed():

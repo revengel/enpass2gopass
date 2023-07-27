@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"bytes"
@@ -58,7 +58,8 @@ func isRussianChar(r rune) bool {
 	return false
 }
 
-func transliterate(in string) string {
+// Transliterate -
+func Transliterate(in string) string {
 	if in == "" {
 		return ""
 	}
