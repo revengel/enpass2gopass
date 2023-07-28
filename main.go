@@ -11,11 +11,12 @@ import (
 
 	"github.com/revengel/enpass2gopass/enpass"
 	"github.com/revengel/enpass2gopass/gopassstore"
+	"github.com/revengel/enpass2gopass/utils"
 	log "github.com/sirupsen/logrus"
 )
 
 var (
-	insertedPaths = newInsertedPaths()
+	insertedPaths = utils.NewInsertedPaths()
 	foldersMap    enpass.FoldersMap
 )
 
@@ -102,7 +103,12 @@ func main() {
 			if log.GetLevel() >= log.DebugLevel {
 				// output data secrets
 				fmt.Println()
-				reader := bytes.NewReader(s.Bytes())
+				var sbytes, err = s.Bytes()
+				if err != nil {
+					ll.WithError(err).Fatal("cannot get secret's bytes")
+				}
+
+				reader := bytes.NewReader(sbytes)
 				io.Copy(os.Stdout, reader)
 			}
 

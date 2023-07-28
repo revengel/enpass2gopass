@@ -7,7 +7,6 @@ import (
 
 	"github.com/gopasspw/gopass/pkg/gopass"
 	"github.com/gopasspw/gopass/pkg/gopass/api"
-	"github.com/gopasspw/gopass/pkg/gopass/secrets"
 	"github.com/revengel/enpass2gopass/utils"
 )
 
@@ -134,70 +133,4 @@ func NewGopass(ctx context.Context) (g *Gopass, err error) {
 		ctx: ctx,
 		api: gp,
 	}, nil
-}
-
-// SecretSet -
-func SecretSet(s *secrets.AKV, k, v string, multiline bool) (err error) {
-	if k == "" || v == "" {
-		return
-	}
-
-	if multiline {
-		data := []byte(fmt.Sprintf("%s\n%s\n", k, v))
-		_, err = s.Write(data)
-		return err
-	}
-
-	return s.Set(k, v)
-}
-
-// SecretAddYamlData -
-func SecretAddYamlData(data, k, v string) string {
-	if k == "" || v == "" {
-		return data
-	}
-
-	if data == "" {
-		data += "---\n"
-	}
-
-	data += fmt.Sprintf("%s\n\n%s\n", k, v)
-	return data
-}
-
-// GetItemAttachSecret -
-func GetItemAttachSecret(flname, dataBase64 string) (o gopass.Byter, err error) {
-	var s = secrets.NewAKV()
-
-	err = SecretSet(s, "Content-Disposition",
-		fmt.Sprintf("attachment; filename=\"%s\"", flname), false)
-	if err != nil {
-		return s, err
-	}
-
-	err = SecretSet(s, "Content-Transfer-Encoding", "Base64", false)
-	if err != nil {
-		return s, err
-	}
-
-	_, err = s.Write([]byte(dataBase64))
-	if err != nil {
-		return
-	}
-
-	return s, nil
-}
-
-// SaveSecret -
-func SaveSecret(s gopass.Byter, gp *Gopass, p string, dryrun bool) (saved bool, err error) {
-	if dryrun {
-		return
-	}
-
-	saved, err = gp.SetIfChanged(s, p)
-	if err != nil {
-		return false, err
-	}
-
-	return true, nil
 }

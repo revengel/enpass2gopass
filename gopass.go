@@ -3,24 +3,16 @@ package main
 import (
 	"fmt"
 
-	"github.com/gopasspw/gopass/pkg/gopass"
-	"github.com/gopasspw/gopass/pkg/gopass/secrets"
 	"github.com/revengel/enpass2gopass/enpass"
 	"github.com/revengel/enpass2gopass/gopassstore"
 	log "github.com/sirupsen/logrus"
 )
 
-var (
-	// ErrNotFound is returned if an entry was not found.
-	ErrNotFound = fmt.Errorf("entry is not in the password store")
-)
-
-func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]gopass.Byter, error) {
+func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]*gopassstore.GopassSecret, error) {
 	var (
 		err    error
-		data   string
-		o      = make(map[string]gopass.Byter)
-		s      = secrets.NewAKV()
+		o      = make(map[string]*gopassstore.GopassSecret)
+		s      = gopassstore.NewEmptyGopassSecret()
 		folder = item.GetFirstFolder(foldersMap)
 	)
 
@@ -34,24 +26,24 @@ func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]gopas
 		return o, err
 	}
 
-	err = gopassstore.SecretSet(s, "title", item.GetTitle(), false)
+	err = s.Set("title", item.GetTitle(), false)
 	if err != nil {
 		return o, err
 	}
 
-	err = gopassstore.SecretSet(s, "subtitle", item.GetSubtitle(), false)
+	err = s.Set("subtitle", item.GetSubtitle(), false)
 	if err != nil {
 		return o, err
 	}
 
-	err = gopassstore.SecretSet(s, "category", item.GetCategoryPath(), false)
+	err = s.Set("category", item.GetCategoryPath(), false)
 	if err != nil {
 		return o, err
 	}
 
-	data = gopassstore.SecretAddYamlData(data, "note", item.GetNote())
+	s.AddYamlData("note", item.GetNote())
 
-	err = gopassstore.SecretSet(s, "tags", item.GetFoldersStr(foldersMap), false)
+	err = s.Set("tags", item.GetFoldersStr(foldersMap), false)
 	if err != nil {
 		return o, err
 	}
@@ -66,10 +58,11 @@ func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]gopas
 			continue
 		}
 
-		if s.Password() == "" && field.CheckType("password") {
+		if field.CheckType("password") {
 			passwd := field.GetValue()
-			s.SetPassword(passwd)
-			continue
+			if ok := s.SetPassword(passwd); ok {
+				continue
+			}
 		}
 
 		var labelName = field.GetLabel()
@@ -82,11 +75,11 @@ func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]gopas
 		}
 
 		if field.IsMultiline() {
-			data = gopassstore.SecretAddYamlData(data, labelName, field.GetValue())
+			s.AddYamlData(labelName, field.GetValue())
 			continue
 		}
 
-		err = gopassstore.SecretSet(s, labelName, field.GetValue(), field.IsMultiline())
+		err = s.Set(labelName, field.GetValue(), field.IsMultiline())
 		if err != nil {
 			return o, err
 		}
@@ -105,7 +98,7 @@ func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]gopas
 			if err != nil {
 				return o, err
 			}
-			data = gopassstore.SecretAddYamlData(data, labelName, val)
+			s.AddYamlData(labelName, val)
 			continue
 		}
 
@@ -114,7 +107,9 @@ func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]gopas
 			return o, err
 		}
 
-		attachSec, err := getGopassItemAttachSecret(attach)
+		var dataB64 = attach.GetDataBase64Encoded()
+		var flName = attach.GetNameOriginal()
+		attachSec, err := gopassstore.NewAttachmentGopassSecret(flName, dataB64)
 		if err != nil {
 			return o, err
 		}
@@ -122,27 +117,21 @@ func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]gopas
 		o[gopassAttachPath] = attachSec
 	}
 
-	_, err = s.Write([]byte(data))
-	if err != nil {
-		return o, err
-	}
-
 	o[gopassDataPath] = s
 	return o, err
 }
 
-func getGopassItemAttachSecret(attach enpass.Attachment) (o gopass.Byter, err error) {
-	var dataB64 = attach.GetDataBase64Encoded()
-	var flName = attach.GetNameOriginal()
-	return gopassstore.GetItemAttachSecret(flName, dataB64)
-}
-
-func gopassSaveSecret(s gopass.Byter, gp *gopassstore.Gopass, p string, dryrun bool, l *log.Entry) error {
+func gopassSaveSecret(s *gopassstore.GopassSecret, gp *gopassstore.Gopass, p string, dryrun bool, l *log.Entry) error {
 	if dryrun {
 		return nil
 	}
 
-	saved, err := gopassstore.SaveSecret(s, gp, p, dryrun)
+	secret, err := s.GetSecret()
+	if err != nil {
+		return err
+	}
+
+	saved, err := gp.SetIfChanged(secret, p)
 	if err != nil {
 		return err
 	}
