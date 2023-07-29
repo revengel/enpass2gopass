@@ -11,6 +11,7 @@ import (
 
 	"github.com/revengel/enpass2gopass/enpass"
 	"github.com/revengel/enpass2gopass/gopassstore"
+	"github.com/revengel/enpass2gopass/store"
 	"github.com/revengel/enpass2gopass/utils"
 	log "github.com/sirupsen/logrus"
 )
@@ -35,7 +36,7 @@ func main() {
 		prefix        string
 		logLevel      string
 		dryrun, debug bool
-		gp            *gopassstore.Gopass
+		gp            store.Store
 		err           error
 	)
 
@@ -103,12 +104,7 @@ func main() {
 			if log.GetLevel() >= log.DebugLevel {
 				// output data secrets
 				fmt.Println()
-				var sbytes, err = s.Bytes()
-				if err != nil {
-					ll.WithError(err).Fatal("cannot get secret's bytes")
-				}
-
-				reader := bytes.NewReader(sbytes)
+				reader := bytes.NewReader(s.Bytes())
 				io.Copy(os.Stdout, reader)
 			}
 

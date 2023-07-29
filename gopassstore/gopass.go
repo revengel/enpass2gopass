@@ -7,6 +7,7 @@ import (
 
 	"github.com/gopasspw/gopass/pkg/gopass"
 	"github.com/gopasspw/gopass/pkg/gopass/api"
+	"github.com/revengel/enpass2gopass/store"
 	"github.com/revengel/enpass2gopass/utils"
 )
 
@@ -63,12 +64,8 @@ func (g Gopass) List(keyRe string) (keys []string, err error) {
 }
 
 // Remove -
-func (g Gopass) Remove(p string) (err error) {
-	err = g.api.Remove(g.ctx, p)
-	if err != nil {
-		return
-	}
-	return
+func (g Gopass) Remove(p string) error {
+	return g.api.Remove(g.ctx, p)
 }
 
 // Close -
@@ -98,7 +95,7 @@ func (g Gopass) DiffWithStorage(s gopass.Byter, p string) (bool, error) {
 }
 
 // SetIfChanged -
-func (g Gopass) SetIfChanged(s gopass.Byter, p string) (bool, error) {
+func (g Gopass) SetIfChanged(s store.Secret, p string) (bool, error) {
 	same, err := g.DiffWithStorage(s, p)
 	if err != nil {
 		return false, err

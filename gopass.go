@@ -5,16 +5,19 @@ import (
 
 	"github.com/revengel/enpass2gopass/enpass"
 	"github.com/revengel/enpass2gopass/gopassstore"
+	"github.com/revengel/enpass2gopass/store"
 	log "github.com/sirupsen/logrus"
 )
 
-func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]*gopassstore.GopassSecret, error) {
+func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]store.Secret, error) {
 	var (
 		err    error
-		o      = make(map[string]*gopassstore.GopassSecret)
-		s      = gopassstore.NewEmptyGopassSecret()
+		o      = make(map[string]store.Secret)
+		s      store.Secret
 		folder = item.GetFirstFolder(foldersMap)
 	)
+
+	s = gopassstore.NewEmptyGopassSecret()
 
 	gopassPath, err := getGopassPath(prefix, folder, item)
 	if err != nil {
@@ -26,24 +29,27 @@ func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]*gopa
 		return o, err
 	}
 
-	err = s.Set("title", item.GetTitle(), false)
+	err = s.Set("title", item.GetTitle(), store.SecretSimpleField, false)
 	if err != nil {
 		return o, err
 	}
 
-	err = s.Set("subtitle", item.GetSubtitle(), false)
+	err = s.Set("subtitle", item.GetSubtitle(), store.SecretSimpleField, false)
 	if err != nil {
 		return o, err
 	}
 
-	err = s.Set("category", item.GetCategoryPath(), false)
+	err = s.Set("category", item.GetCategoryPath(), store.SecretSimpleField, false)
 	if err != nil {
 		return o, err
 	}
 
-	s.AddYamlData("note", item.GetNote())
+	err = s.Set("note", item.GetNote(), store.SecretYamlField, false)
+	if err != nil {
+		return o, err
+	}
 
-	err = s.Set("tags", item.GetFoldersStr(foldersMap), false)
+	err = s.Set("tags", item.GetFoldersStr(foldersMap), store.SecretSimpleField, false)
 	if err != nil {
 		return o, err
 	}
@@ -58,13 +64,6 @@ func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]*gopa
 			continue
 		}
 
-		if field.CheckType("password") {
-			passwd := field.GetValue()
-			if ok := s.SetPassword(passwd); ok {
-				continue
-			}
-		}
-
 		var labelName = field.GetLabel()
 		if field.CheckType("totp") {
 			labelName = "totp"
@@ -74,12 +73,16 @@ func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]*gopa
 			labelName = "email"
 		}
 
-		if field.IsMultiline() {
-			s.AddYamlData(labelName, field.GetValue())
-			continue
+		var fieldType = store.SecretSimpleField
+		if field.CheckType("password") {
+			fieldType = store.SecretPasswordField
 		}
 
-		err = s.Set(labelName, field.GetValue(), field.IsMultiline())
+		if field.IsMultiline() {
+			fieldType = store.SecretYamlField
+		}
+
+		err = s.Set(labelName, field.GetValue(), fieldType, false)
 		if err != nil {
 			return o, err
 		}
@@ -98,7 +101,11 @@ func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]*gopa
 			if err != nil {
 				return o, err
 			}
-			s.AddYamlData(labelName, val)
+
+			err = s.Set(labelName, val, store.SecretYamlField, false)
+			if err != nil {
+				return o, err
+			}
 			continue
 		}
 
@@ -117,21 +124,21 @@ func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]*gopa
 		o[gopassAttachPath] = attachSec
 	}
 
+	err = s.Finalize()
+	if err != nil {
+		return o, err
+	}
+
 	o[gopassDataPath] = s
 	return o, err
 }
 
-func gopassSaveSecret(s *gopassstore.GopassSecret, gp *gopassstore.Gopass, p string, dryrun bool, l *log.Entry) error {
+func gopassSaveSecret(s store.Secret, gp store.Store, p string, dryrun bool, l *log.Entry) error {
 	if dryrun {
 		return nil
 	}
 
-	secret, err := s.GetSecret()
-	if err != nil {
-		return err
-	}
-
-	saved, err := gp.SetIfChanged(secret, p)
+	saved, err := gp.SetIfChanged(s, p)
 	if err != nil {
 		return err
 	}

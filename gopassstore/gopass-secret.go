@@ -3,8 +3,8 @@ package gopassstore
 import (
 	"fmt"
 
-	"github.com/gopasspw/gopass/pkg/gopass"
 	"github.com/gopasspw/gopass/pkg/gopass/secrets"
+	"github.com/revengel/enpass2gopass/store"
 )
 
 // GopassSecret -
@@ -15,39 +15,38 @@ type GopassSecret struct {
 }
 
 // Set -
-func (gs *GopassSecret) Set(k, v string, multiline bool) (err error) {
+func (gs *GopassSecret) Set(k, v string, fieldType string, sensitivity bool) error {
+	var err error
+	_ = sensitivity
 	if k == "" || v == "" {
-		return
+		return nil
 	}
 
-	if multiline {
+	switch fieldType {
+	case store.SecretPasswordField:
+		// SetPassword -
+		if gs.secret.Password() == "" {
+			gs.secret.SetPassword(v)
+			return nil
+		}
+		fallthrough
+	case store.SecretSimpleField:
+		return gs.secret.Set(k, v)
+	case store.SecretMultilineField:
 		data := []byte(fmt.Sprintf("%s\n%s\n", k, v))
 		_, err = gs.secret.Write(data)
 		return err
-	}
-	return gs.secret.Set(k, v)
-}
-
-// SetPassword -
-func (gs *GopassSecret) SetPassword(v string) bool {
-	if gs.secret.Password() != "" {
-		return false
-	}
-	gs.secret.SetPassword(v)
-	return true
-}
-
-// AddYamlData -
-func (gs *GopassSecret) AddYamlData(k, v string) {
-	if k == "" || v == "" {
-		return
+	case store.SecretYamlField:
+		// AddYamlData -
+		if gs.data == "" {
+			gs.data += "---\n"
+		}
+		gs.data += fmt.Sprintf("%s\n\n%s\n", k, v)
+	default:
+		return store.ErrSecretFieldInvalidType
 	}
 
-	if gs.data == "" {
-		gs.data += "---\n"
-	}
-
-	gs.data += fmt.Sprintf("%s\n\n%s\n", k, v)
+	return nil
 }
 
 func (gs *GopassSecret) write(data string) (err error) {
@@ -58,9 +57,11 @@ func (gs *GopassSecret) write(data string) (err error) {
 	return
 }
 
-func (gs *GopassSecret) finalize() (err error) {
+// Finalize -
+func (gs *GopassSecret) Finalize() error {
+	var err error
 	if gs.finalized {
-		return
+		return nil
 	}
 
 	err = gs.write(gs.data)
@@ -69,27 +70,12 @@ func (gs *GopassSecret) finalize() (err error) {
 	}
 
 	gs.finalized = true
-	return
-}
-
-// GetSecret -
-func (gs *GopassSecret) GetSecret() (s gopass.Byter, err error) {
-	err = gs.finalize()
-	if err != nil {
-		return nil, err
-	}
-
-	return gs.secret, nil
+	return nil
 }
 
 // Bytes -
-func (gs *GopassSecret) Bytes() ([]byte, error) {
-	s, err := gs.GetSecret()
-	if err != nil {
-		return nil, err
-	}
-
-	return s.Bytes(), nil
+func (gs *GopassSecret) Bytes() []byte {
+	return gs.secret.Bytes()
 }
 
 // NewEmptyGopassSecret -
@@ -106,12 +92,12 @@ func NewAttachmentGopassSecret(filename, base64data string) (s *GopassSecret, er
 
 	err = s.Set("Content-Disposition",
 		fmt.Sprintf("attachment; filename=\"%s\"", filename),
-		false)
+		store.SecretSimpleField, false)
 	if err != nil {
 		return
 	}
 
-	err = s.Set("Content-Transfer-Encoding", "Base64", false)
+	err = s.Set("Content-Transfer-Encoding", "Base64", store.SecretSimpleField, false)
 	if err != nil {
 		return
 	}
