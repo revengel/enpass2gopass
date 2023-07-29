@@ -1,9 +1,11 @@
-package main
+package enpass
 
 import (
 	"encoding/base64"
 	"net/http"
 	"strings"
+
+	"github.com/revengel/enpass2gopass/utils"
 )
 
 // Attachment -
@@ -83,7 +85,7 @@ func (a Attachment) GetName() string {
 
 // GetLabelName -
 func (a Attachment) GetLabelName() string {
-	return transliterate(a.Name)
+	return utils.Transliterate(a.Name)
 }
 
 // GetNameOriginal -

@@ -1,8 +1,10 @@
-package main
+package enpass
 
 import (
 	"fmt"
 	"strings"
+
+	"github.com/revengel/enpass2gopass/utils"
 )
 
 // DataItem -
@@ -44,7 +46,7 @@ func (i DataItem) GetCategory() string {
 
 // GetCategoryPath -
 func (i DataItem) GetCategoryPath() string {
-	return transliterate(i.Category)
+	return utils.Transliterate(i.Category)
 }
 
 // GetTitle -
@@ -54,7 +56,7 @@ func (i DataItem) GetTitle() string {
 
 // GetTitlePath -
 func (i DataItem) GetTitlePath() string {
-	return transliterate(i.Title)
+	return utils.Transliterate(i.Title)
 }
 
 // GetSubtitle -
@@ -68,19 +70,19 @@ func (i DataItem) GetNote() string {
 }
 
 // GetFolders -
-func (i DataItem) GetFolders() []string {
+func (i DataItem) GetFolders(foldersMap FoldersMap) []string {
 	return foldersMap.GetFolders(i.Folders)
 }
 
 // GetFirstFolder -
-func (i DataItem) GetFirstFolder() string {
-	if fs := i.GetFolders(); len(fs) > 0 {
+func (i DataItem) GetFirstFolder(foldersMap FoldersMap) string {
+	if fs := i.GetFolders(foldersMap); len(fs) > 0 {
 		return fs[0]
 	}
 	return ""
 }
 
 // GetFoldersStr -
-func (i DataItem) GetFoldersStr() string {
-	return fmt.Sprintf("[%s]", strings.Join(i.GetFolders(), ", "))
+func (i DataItem) GetFoldersStr(foldersMap FoldersMap) string {
+	return fmt.Sprintf("[%s]", strings.Join(i.GetFolders(foldersMap), ", "))
 }

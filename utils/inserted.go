@@ -1,10 +1,8 @@
-package main
+package utils
 
 import (
 	"fmt"
 	"sync"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // InsertedPaths -
@@ -19,7 +17,7 @@ func (i *InsertedPaths) Register(p string) {
 	defer i.Unlock()
 
 	var val uint64 = 1
-	var hash = getHash(p)
+	var hash = GetHash(p)
 	if v, ok := i.data[hash]; ok {
 		val = v + 1
 	}
@@ -31,7 +29,7 @@ func (i *InsertedPaths) Check(p string) uint64 {
 	i.Lock()
 	defer i.Unlock()
 
-	var hash = getHash(p)
+	var hash = GetHash(p)
 	if v, ok := i.data[hash]; ok {
 		return v
 	}
@@ -39,16 +37,16 @@ func (i *InsertedPaths) Check(p string) uint64 {
 }
 
 // GetUniquePath -
-func (i *InsertedPaths) GetUniquePath(p string) string {
+func (i *InsertedPaths) GetUniquePath(p string) (bool, string) {
 	if c := i.Check(p); c > 0 {
 		newPath := fmt.Sprintf("%s_%d", p, c+1)
-		log.Warnf("gopass path '%s' will be rename to '%s'", p, newPath)
-		return newPath
+		return true, newPath
 	}
-	return p
+	return false, p
 }
 
-func newInsertedPaths() *InsertedPaths {
+// NewInsertedPaths -
+func NewInsertedPaths() *InsertedPaths {
 	return &InsertedPaths{
 		data: make(map[string]uint64),
 	}

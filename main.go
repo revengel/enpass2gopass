@@ -9,12 +9,15 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/revengel/enpass2gopass/enpass"
+	"github.com/revengel/enpass2gopass/gopassstore"
+	"github.com/revengel/enpass2gopass/utils"
 	log "github.com/sirupsen/logrus"
 )
 
 var (
-	insertedPaths = newInsertedPaths()
-	foldersMap    FoldersMap
+	insertedPaths = utils.NewInsertedPaths()
+	foldersMap    enpass.FoldersMap
 )
 
 func init() {
@@ -32,7 +35,7 @@ func main() {
 		prefix        string
 		logLevel      string
 		dryrun, debug bool
-		gp            *Gopass
+		gp            *gopassstore.Gopass
 		err           error
 	)
 
@@ -68,14 +71,14 @@ func main() {
 		}
 	}()
 
-	gp, err = newGopass(ctx)
+	gp, err = gopassstore.NewGopass(ctx)
 	if err != nil {
 		log.Fatalf("Failed to connect gopass: %s", err)
 	}
 
 	defer gp.Close()
 
-	data, err := loadData(values[0])
+	data, err := enpass.LoadData(values[0])
 	if err != nil {
 		log.Fatalf("Cannot load data from json file: %s", err.Error())
 	}
@@ -100,7 +103,12 @@ func main() {
 			if log.GetLevel() >= log.DebugLevel {
 				// output data secrets
 				fmt.Println()
-				reader := bytes.NewReader(s.Bytes())
+				var sbytes, err = s.Bytes()
+				if err != nil {
+					ll.WithError(err).Fatal("cannot get secret's bytes")
+				}
+
+				reader := bytes.NewReader(sbytes)
 				io.Copy(os.Stdout, reader)
 			}
 
@@ -112,7 +120,7 @@ func main() {
 	}
 
 	var lc = log.WithField("type", "cleaner")
-	ll, err := gp.list(`^` + prefix + `/`)
+	ll, err := gp.List(`^` + prefix + `/`)
 	if err != nil {
 		lc.WithError(err).Fatal("cannot get gopass keys list")
 	}
@@ -124,7 +132,7 @@ func main() {
 
 		var lck = lc.WithField("gopassPath", k)
 		lck.Info("gopass key will be deleted")
-		err = gp.remove(k)
+		err = gp.Remove(k)
 		if err != nil {
 			lck.Fatal("cannot delete gopass key")
 		}

@@ -1,4 +1,4 @@
-package main
+package enpass
 
 // FoldersMap -
 type FoldersMap map[string]string
@@ -14,8 +14,8 @@ func (f FoldersMap) GetFolder(id string) string {
 // GetFolders -
 func (f FoldersMap) GetFolders(ids []string) (out []string) {
 	for _, id := range ids {
-		if f := f.GetFolder(id); id != "" {
-			out = append(out, f)
+		if fv := f.GetFolder(id); id != "" && fv != "" {
+			out = append(out, fv)
 		}
 	}
 	return out

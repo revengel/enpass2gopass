@@ -1,166 +1,19 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"regexp"
 
-	"github.com/gopasspw/gopass/pkg/gopass"
-	"github.com/gopasspw/gopass/pkg/gopass/api"
-	"github.com/gopasspw/gopass/pkg/gopass/secrets"
+	"github.com/revengel/enpass2gopass/enpass"
+	"github.com/revengel/enpass2gopass/gopassstore"
 	log "github.com/sirupsen/logrus"
 )
 
-var (
-	// ErrNotFound is returned if an entry was not found.
-	ErrNotFound = fmt.Errorf("entry is not in the password store")
-)
-
-// Gopass -
-type Gopass struct {
-	ctx context.Context
-	api *api.Gopass
-}
-
-func (g Gopass) get(p string) (o gopass.Secret, err error) {
-	o, err = g.api.Get(g.ctx, p, "latest")
-	if err != nil {
-		return
-	}
-	return
-}
-
-func (g Gopass) set(s gopass.Byter, p string) (err error) {
-	err = g.api.Set(g.ctx, p, s)
-	if err != nil {
-		return
-	}
-	return
-}
-
-func (g Gopass) list(keyRe string) (keys []string, err error) {
-	keys, err = g.api.List(g.ctx)
-	if err != nil {
-		return
-	}
-
-	if keyRe == "" {
-		return
-	}
-
-	gopassKeyRe := regexp.MustCompile(keyRe)
-	var filteredKeys []string
-	for _, k := range keys {
-		if !gopassKeyRe.MatchString(k) {
-			continue
-		}
-		filteredKeys = append(filteredKeys, k)
-	}
-
-	return filteredKeys, nil
-}
-
-func (g Gopass) remove(p string) (err error) {
-	err = g.api.Remove(g.ctx, p)
-	if err != nil {
-		return
-	}
-	return
-}
-
-// Close -
-func (g *Gopass) Close() error {
-	return g.api.Close(g.ctx)
-}
-
-func (g Gopass) diff(a, b gopass.Byter) bool {
-	ahash := getHashFromBytes(a.Bytes())
-	bhash := getHashFromBytes(b.Bytes())
-	return ahash == bhash
-}
-
-func (g Gopass) diffWithStorage(s gopass.Byter, p string) (bool, error) {
-	rSec, err := g.get(p)
-	if err != nil {
-		// TODO: need be refactoring
-		if err.Error() == ErrNotFound.Error() {
-			return false, nil
-		}
-		return false, err
-	}
-
-	return g.diff(s, rSec), nil
-}
-
-func (g Gopass) setIfChanged(s gopass.Byter, p string) (bool, error) {
-	same, err := g.diffWithStorage(s, p)
-	if err != nil {
-		return false, err
-	}
-
-	if same {
-		return false, nil
-	}
-
-	err = g.set(s, p)
-	if err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-func (g Gopass) sync() error {
-	var err = g.api.Sync(g.ctx)
-	return err
-}
-
-func newGopass(ctx context.Context) (g *Gopass, err error) {
-	var gp *api.Gopass
-	gp, err = api.New(ctx)
-	if err != nil {
-		return g, fmt.Errorf("failed to initialize gopass API: %s", err.Error())
-	}
-
-	return &Gopass{
-		ctx: ctx,
-		api: gp,
-	}, nil
-}
-
-func gopassSecretSet(s *secrets.AKV, k, v string, multiline bool) (err error) {
-	if k == "" || v == "" {
-		return
-	}
-
-	if multiline {
-		data := []byte(fmt.Sprintf("%s\n%s\n", k, v))
-		_, err = s.Write(data)
-		return err
-	}
-
-	return s.Set(k, v)
-}
-
-func gopassSecretAddYamlData(data, k, v string) string {
-	if k == "" || v == "" {
-		return data
-	}
-
-	if data == "" {
-		data += "---\n"
-	}
-
-	data += fmt.Sprintf("%s\n\n%s\n", k, v)
-	return data
-}
-
-func getGopassItemSecrets(prefix string, item DataItem) (map[string]gopass.Byter, error) {
+func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]*gopassstore.GopassSecret, error) {
 	var (
 		err    error
-		data   string
-		o      = make(map[string]gopass.Byter)
-		s      = secrets.NewAKV()
-		folder = item.GetFirstFolder()
+		o      = make(map[string]*gopassstore.GopassSecret)
+		s      = gopassstore.NewEmptyGopassSecret()
+		folder = item.GetFirstFolder(foldersMap)
 	)
 
 	gopassPath, err := getGopassPath(prefix, folder, item)
@@ -173,24 +26,24 @@ func getGopassItemSecrets(prefix string, item DataItem) (map[string]gopass.Byter
 		return o, err
 	}
 
-	err = gopassSecretSet(s, "title", item.GetTitle(), false)
+	err = s.Set("title", item.GetTitle(), false)
 	if err != nil {
 		return o, err
 	}
 
-	err = gopassSecretSet(s, "subtitle", item.GetSubtitle(), false)
+	err = s.Set("subtitle", item.GetSubtitle(), false)
 	if err != nil {
 		return o, err
 	}
 
-	err = gopassSecretSet(s, "category", item.GetCategoryPath(), false)
+	err = s.Set("category", item.GetCategoryPath(), false)
 	if err != nil {
 		return o, err
 	}
 
-	data = gopassSecretAddYamlData(data, "note", item.GetNote())
+	s.AddYamlData("note", item.GetNote())
 
-	err = gopassSecretSet(s, "tags", item.GetFoldersStr(), false)
+	err = s.Set("tags", item.GetFoldersStr(foldersMap), false)
 	if err != nil {
 		return o, err
 	}
@@ -205,10 +58,11 @@ func getGopassItemSecrets(prefix string, item DataItem) (map[string]gopass.Byter
 			continue
 		}
 
-		if s.Password() == "" && field.CheckType("password") {
+		if field.CheckType("password") {
 			passwd := field.GetValue()
-			s.SetPassword(passwd)
-			continue
+			if ok := s.SetPassword(passwd); ok {
+				continue
+			}
 		}
 
 		var labelName = field.GetLabel()
@@ -221,11 +75,11 @@ func getGopassItemSecrets(prefix string, item DataItem) (map[string]gopass.Byter
 		}
 
 		if field.IsMultiline() {
-			data = gopassSecretAddYamlData(data, labelName, field.GetValue())
+			s.AddYamlData(labelName, field.GetValue())
 			continue
 		}
 
-		err = gopassSecretSet(s, labelName, field.GetValue(), field.IsMultiline())
+		err = s.Set(labelName, field.GetValue(), field.IsMultiline())
 		if err != nil {
 			return o, err
 		}
@@ -244,7 +98,7 @@ func getGopassItemSecrets(prefix string, item DataItem) (map[string]gopass.Byter
 			if err != nil {
 				return o, err
 			}
-			data = gopassSecretAddYamlData(data, labelName, val)
+			s.AddYamlData(labelName, val)
 			continue
 		}
 
@@ -253,7 +107,9 @@ func getGopassItemSecrets(prefix string, item DataItem) (map[string]gopass.Byter
 			return o, err
 		}
 
-		attachSec, err := getGopassItemAttachSecret(attach)
+		var dataB64 = attach.GetDataBase64Encoded()
+		var flName = attach.GetNameOriginal()
+		attachSec, err := gopassstore.NewAttachmentGopassSecret(flName, dataB64)
 		if err != nil {
 			return o, err
 		}
@@ -261,44 +117,21 @@ func getGopassItemSecrets(prefix string, item DataItem) (map[string]gopass.Byter
 		o[gopassAttachPath] = attachSec
 	}
 
-	_, err = s.Write([]byte(data))
-	if err != nil {
-		return o, err
-	}
-
 	o[gopassDataPath] = s
 	return o, err
 }
 
-func getGopassItemAttachSecret(attach Attachment) (o gopass.Byter, err error) {
-	var dataB64 = attach.GetDataBase64Encoded()
-	var s = secrets.NewAKV()
-
-	err = gopassSecretSet(s, "Content-Disposition",
-		fmt.Sprintf("attachment; filename=\"%s\"", attach.GetNameOriginal()), false)
-	if err != nil {
-		return s, err
-	}
-
-	err = gopassSecretSet(s, "Content-Transfer-Encoding", "Base64", false)
-	if err != nil {
-		return s, err
-	}
-
-	_, err = s.Write([]byte(dataB64))
-	if err != nil {
-		return
-	}
-
-	return s, nil
-}
-
-func gopassSaveSecret(s gopass.Byter, gp *Gopass, p string, dryrun bool, l *log.Entry) error {
+func gopassSaveSecret(s *gopassstore.GopassSecret, gp *gopassstore.Gopass, p string, dryrun bool, l *log.Entry) error {
 	if dryrun {
 		return nil
 	}
 
-	saved, err := gp.setIfChanged(s, p)
+	secret, err := s.GetSecret()
+	if err != nil {
+		return err
+	}
+
+	saved, err := gp.SetIfChanged(secret, p)
 	if err != nil {
 		return err
 	}

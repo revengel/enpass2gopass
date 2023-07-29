@@ -1,4 +1,4 @@
-module enpass2gopass
+module github.com/revengel/enpass2gopass
 
 go 1.20
 

@@ -1,4 +1,6 @@
-package main
+package enpass
+
+import "github.com/revengel/enpass2gopass/utils"
 
 // Field -
 type Field struct {
@@ -41,7 +43,7 @@ func (f Field) CheckTypes(in []string) bool {
 
 // GetLabel -
 func (f Field) GetLabel() string {
-	return transliterate(f.Label)
+	return utils.Transliterate(f.Label)
 }
 
 // GetValue -

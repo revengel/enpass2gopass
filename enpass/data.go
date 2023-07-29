@@ -1,10 +1,12 @@
-package main
+package enpass
 
 import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/revengel/enpass2gopass/utils"
 )
 
 // Data -
@@ -23,13 +25,13 @@ type FolderItem struct {
 func (d Data) GetFoldersMap() FoldersMap {
 	out := make(map[string]string)
 	for _, folder := range d.Folders {
-		out[folder.UUID] = transliterate(folder.Title)
+		out[folder.UUID] = utils.Transliterate(folder.Title)
 	}
 	return out
 }
 
-// loadind data from json file
-func loadData(dataPath string) (d Data, err error) {
+// LoadData - loadind data from json file
+func LoadData(dataPath string) (d Data, err error) {
 	absPath, err := filepath.Abs(dataPath)
 	if err != nil {
 		return

@@ -1,36 +1,12 @@
 package main
 
 import (
-	"crypto/sha256"
 	"errors"
-	"fmt"
 	"path/filepath"
-	"strings"
 
+	"github.com/revengel/enpass2gopass/enpass"
 	log "github.com/sirupsen/logrus"
 )
-
-func getHashFromBytes(in []byte) string {
-	h := sha256.New()
-	h.Write(in)
-	return fmt.Sprintf("%x", h.Sum(nil))
-}
-
-func getHash(in string) string {
-	return getHashFromBytes([]byte(in))
-}
-
-func truncStr(in string, maxLen int) string {
-	if len(in) <= maxLen {
-		return in
-	}
-	return strings.TrimSuffix(in[:maxLen], "_")
-}
-
-func indent(spaces int, v string) string {
-	pad := strings.Repeat(" ", spaces)
-	return pad + strings.Replace(v, "\n", "\n"+pad, -1)
-}
 
 func setLogLevel(level string, debug bool) (err error) {
 	if debug {
@@ -47,7 +23,16 @@ func setLogLevel(level string, debug bool) (err error) {
 	return
 }
 
-func getGopassPath(prefix, folder string, item DataItem) (out string, err error) {
+func getUniquePath(in string) (out string) {
+	var changed bool
+	changed, out = insertedPaths.GetUniquePath(in)
+	if changed {
+		log.Warnf("gopass path '%s' will be rename to '%s'", in, out)
+	}
+	return out
+}
+
+func getGopassPath(prefix, folder string, item enpass.DataItem) (out string, err error) {
 	out = prefix
 	switch {
 	case item.IsTrashed():
@@ -73,7 +58,7 @@ func getGopassPath(prefix, folder string, item DataItem) (out string, err error)
 		return "", errors.New("title cannot be empty")
 	}
 	out = filepath.Join(out, title)
-	uniqPath := insertedPaths.GetUniquePath(out)
+	uniqPath := getUniquePath(out)
 
 	insertedPaths.Register(out)
 	return uniqPath, nil
@@ -95,7 +80,7 @@ func getGopassAttachPath(prefix, attachName string) (out string, err error) {
 	}
 
 	out = filepath.Join(prefix, "attachments", attachName)
-	out = insertedPaths.GetUniquePath(out)
+	out = getUniquePath(out)
 	insertedPaths.Register(out)
 	return out, err
 }
