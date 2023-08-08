@@ -16,7 +16,6 @@ type GopassSecret struct {
 
 // Set -
 func (gs *GopassSecret) Set(k, v string, fieldType string, sensitivity bool) error {
-	var err error
 	_ = sensitivity
 	if k == "" || v == "" {
 		return nil
@@ -30,23 +29,19 @@ func (gs *GopassSecret) Set(k, v string, fieldType string, sensitivity bool) err
 			return nil
 		}
 		fallthrough
-	case store.SecretSimpleField:
+	case store.SecretTitileField, store.SecretSimpleField:
 		return gs.secret.Set(k, v)
 	case store.SecretMultilineField:
-		data := []byte(fmt.Sprintf("%s\n%s\n", k, v))
-		_, err = gs.secret.Write(data)
-		return err
-	case store.SecretYamlField:
-		// AddYamlData -
+		var data string
 		if gs.data == "" {
-			gs.data += "---\n"
+			data += "---\n"
 		}
-		gs.data += fmt.Sprintf("%s\n\n%s\n", k, v)
+		data += fmt.Sprintf("%s\n\n%s\n", k, v)
+		gs.data += data
+		return gs.write(data)
 	default:
 		return store.ErrSecretFieldInvalidType
 	}
-
-	return nil
 }
 
 func (gs *GopassSecret) write(data string) (err error) {
@@ -55,22 +50,6 @@ func (gs *GopassSecret) write(data string) (err error) {
 		return err
 	}
 	return
-}
-
-// Finalize -
-func (gs *GopassSecret) Finalize() error {
-	var err error
-	if gs.finalized {
-		return nil
-	}
-
-	err = gs.write(gs.data)
-	if err != nil {
-		return err
-	}
-
-	gs.finalized = true
-	return nil
 }
 
 // Bytes -

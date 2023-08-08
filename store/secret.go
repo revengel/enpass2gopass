@@ -3,14 +3,16 @@ package store
 import "errors"
 
 const (
+	// SecretTitileField - secret field password type
+	SecretTitileField = "title"
 	// SecretPasswordField - secret field password type
 	SecretPasswordField = "password"
 	// SecretSimpleField - secret field simple text type
 	SecretSimpleField = "simple"
 	// SecretMultilineField - secret field multiline type
 	SecretMultilineField = "multiline"
-	// SecretYamlField - secret field yaml type
-	SecretYamlField = "yaml"
+	// SecretAttachmentField - secret field multiline type
+	SecretAttachmentField = "attachment"
 )
 
 var (
@@ -21,6 +23,5 @@ var (
 // Secret -
 type Secret interface {
 	Set(k, v string, fieldType string, sensitivity bool) error
-	Finalize() error
 	Bytes() []byte
 }

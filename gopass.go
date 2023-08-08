@@ -29,7 +29,7 @@ func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]store
 		return o, err
 	}
 
-	err = s.Set("title", item.GetTitle(), store.SecretSimpleField, false)
+	err = s.Set("title", item.GetTitle(), store.SecretTitileField, false)
 	if err != nil {
 		return o, err
 	}
@@ -44,7 +44,7 @@ func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]store
 		return o, err
 	}
 
-	err = s.Set("note", item.GetNote(), store.SecretYamlField, false)
+	err = s.Set("note", item.GetNote(), store.SecretMultilineField, false)
 	if err != nil {
 		return o, err
 	}
@@ -79,7 +79,7 @@ func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]store
 		}
 
 		if field.IsMultiline() {
-			fieldType = store.SecretYamlField
+			fieldType = store.SecretMultilineField
 		}
 
 		err = s.Set(labelName, field.GetValue(), fieldType, false)
@@ -102,7 +102,7 @@ func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]store
 				return o, err
 			}
 
-			err = s.Set(labelName, val, store.SecretYamlField, false)
+			err = s.Set(labelName, val, store.SecretMultilineField, false)
 			if err != nil {
 				return o, err
 			}
@@ -122,11 +122,6 @@ func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]store
 		}
 
 		o[gopassAttachPath] = attachSec
-	}
-
-	err = s.Finalize()
-	if err != nil {
-		return o, err
 	}
 
 	o[gopassDataPath] = s
