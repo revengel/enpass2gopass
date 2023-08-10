@@ -23,17 +23,7 @@ func setLogLevel(level string, debug bool) (err error) {
 	return
 }
 
-func getUniquePath(in string) (out string) {
-	var changed bool
-	changed, out = insertedPaths.GetUniquePath(in)
-	if changed {
-		log.Warnf("gopass path '%s' will be rename to '%s'", in, out)
-	}
-	return out
-}
-
-func getGopassPath(prefix, folder string, item enpass.DataItem) (out string, err error) {
-	out = prefix
+func getGopassPath(folder string, item enpass.DataItem) (out string, err error) {
 	switch {
 	case item.IsTrashed():
 		out = filepath.Join(out, "trash")
@@ -58,29 +48,6 @@ func getGopassPath(prefix, folder string, item enpass.DataItem) (out string, err
 		return "", errors.New("title cannot be empty")
 	}
 	out = filepath.Join(out, title)
-	uniqPath := getUniquePath(out)
 
-	insertedPaths.Register(out)
-	return uniqPath, nil
-}
-
-func getGopassDataPath(prefix string) (out string, err error) {
-	out = filepath.Join(prefix, "data")
-	insertedPaths.Register(out)
-	return out, err
-}
-
-func getGopassAttachPath(prefix, attachName string) (out string, err error) {
-	if prefix == "" {
-		return "", errors.New("prefix cannot be empty")
-	}
-
-	if attachName == "" {
-		return "", errors.New("attachName cannot be empty")
-	}
-
-	out = filepath.Join(prefix, "attachments", attachName)
-	out = getUniquePath(out)
-	insertedPaths.Register(out)
-	return out, err
+	return out, nil
 }

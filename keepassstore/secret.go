@@ -26,6 +26,13 @@ func (s Secret) setKey(k, v string, sensitivity bool) error {
 	return nil
 }
 
+func (s Secret) setKeyOrAlt(k, altK, v string, sensitivity bool) error {
+	if t := s.entry.GetContent(k); t == "" {
+		return s.setKey(k, v, sensitivity)
+	}
+	return s.setKey(altK, v, sensitivity)
+}
+
 // Set -
 func (s Secret) Set(k, v string, fieldType string, sensitivity bool) error {
 	if k == "" || v == "" {
@@ -33,16 +40,16 @@ func (s Secret) Set(k, v string, fieldType string, sensitivity bool) error {
 	}
 
 	switch fieldType {
-	case store.SecretTitileField:
-		if t := s.entry.GetTitle(); t != "" {
-			return s.setKey("Title", v, false)
-		}
-		return s.setKey(k, v, sensitivity)
+	case store.SecretTitleField:
+		return s.setKeyOrAlt("Title", k, v, false)
+	case store.SecretUsernameField:
+		return s.setKeyOrAlt("Username", k, v, sensitivity)
 	case store.SecretPasswordField:
-		if p := s.entry.GetPassword(); p != "" {
-			return s.setKey("Password", v, true)
-		}
-		return s.setKey(k, v, sensitivity)
+		return s.setKeyOrAlt("Password", k, v, true)
+	case store.SecretURLField:
+		return s.setKeyOrAlt("URL", k, v, false)
+	case store.SecretTagsField:
+		return s.setKeyOrAlt("Tags", k, v, false)
 	case store.SecretMultilineField:
 		var notes = s.entry.GetContent("Notes")
 		notes += fmt.Sprintf("%s\n\n%s\n", k, v)
@@ -62,11 +69,6 @@ func (s Secret) Set(k, v string, fieldType string, sensitivity bool) error {
 	default:
 		return store.ErrSecretFieldInvalidType
 	}
-}
-
-// Bytes -
-func (s Secret) Bytes() []byte {
-	return nil
 }
 
 // NewSecret -

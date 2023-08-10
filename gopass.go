@@ -6,52 +6,40 @@ import (
 	"github.com/revengel/enpass2gopass/enpass"
 	"github.com/revengel/enpass2gopass/gopassstore"
 	"github.com/revengel/enpass2gopass/store"
-	log "github.com/sirupsen/logrus"
 )
 
-func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]store.Secret, error) {
-	var (
-		err    error
-		o      = make(map[string]store.Secret)
-		s      store.Secret
-		folder = item.GetFirstFolder(foldersMap)
-	)
-
+func getGopassItemSecret(item enpass.DataItem) (p string, s store.Secret, err error) {
+	var folder = item.GetFirstFolder(foldersMap)
 	s = gopassstore.NewEmptyGopassSecret()
 
-	gopassPath, err := getGopassPath(prefix, folder, item)
+	p, err = getGopassPath(folder, item)
 	if err != nil {
-		return o, err
+		return
 	}
 
-	gopassDataPath, err := getGopassDataPath(gopassPath)
+	err = s.Set("title", item.GetTitle(), store.SecretTitleField, false)
 	if err != nil {
-		return o, err
+		return
 	}
 
-	err = s.Set("title", item.GetTitle(), store.SecretTitileField, false)
+	err = s.Set("subtitle", item.GetSubtitle(), store.SecretUsernameField, false)
 	if err != nil {
-		return o, err
-	}
-
-	err = s.Set("subtitle", item.GetSubtitle(), store.SecretSimpleField, false)
-	if err != nil {
-		return o, err
+		return
 	}
 
 	err = s.Set("category", item.GetCategoryPath(), store.SecretSimpleField, false)
 	if err != nil {
-		return o, err
+		return
 	}
 
 	err = s.Set("note", item.GetNote(), store.SecretMultilineField, false)
 	if err != nil {
-		return o, err
+		return
 	}
 
-	err = s.Set("tags", item.GetFoldersStr(foldersMap), store.SecretSimpleField, false)
+	err = s.Set("tags", item.GetFoldersStr(foldersMap), store.SecretTagsField, false)
 	if err != nil {
-		return o, err
+		return
 	}
 
 	for _, field := range item.Fields {
@@ -74,8 +62,11 @@ func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]store
 		}
 
 		var fieldType = store.SecretSimpleField
-		if field.CheckType("password") {
+		switch {
+		case field.CheckType("password"):
 			fieldType = store.SecretPasswordField
+		case field.CheckType("url"):
+			fieldType = store.SecretURLField
 		}
 
 		if field.IsMultiline() {
@@ -84,64 +75,37 @@ func getGopassItemSecrets(prefix string, item enpass.DataItem) (map[string]store
 
 		err = s.Set(labelName, field.GetValue(), fieldType, false)
 		if err != nil {
-			return o, err
+			return
 		}
 	}
 
 	for _, attach := range item.Attachments {
-		var name = attach.GetLabelName()
 		isText, err := attach.IsTextData()
 		if err != nil {
-			return o, err
+			return p, s, err
 		}
 
 		if isText {
 			labelName := fmt.Sprintf("attachment - %s", attach.GetName())
 			val, err := attach.GetDataString()
 			if err != nil {
-				return o, err
+				return p, s, err
 			}
 
 			err = s.Set(labelName, val, store.SecretMultilineField, false)
 			if err != nil {
-				return o, err
+				return p, s, err
 			}
 			continue
 		}
 
-		gopassAttachPath, err := getGopassAttachPath(gopassPath, name)
-		if err != nil {
-			return o, err
-		}
-
 		var dataB64 = attach.GetDataBase64Encoded()
 		var flName = attach.GetNameOriginal()
-		attachSec, err := gopassstore.NewAttachmentGopassSecret(flName, dataB64)
+		err = s.Set(flName, dataB64, store.SecretAttachmentField, false)
 		if err != nil {
-			return o, err
+			return p, s, err
 		}
-
-		o[gopassAttachPath] = attachSec
 	}
 
-	o[gopassDataPath] = s
-	return o, err
-}
-
-func gopassSaveSecret(s store.Secret, gp store.Store, p string, dryrun bool, l *log.Entry) error {
-	if dryrun {
-		return nil
-	}
-
-	saved, err := gp.SetIfChanged(s, p)
-	if err != nil {
-		return err
-	}
-
-	if saved {
-		l.Info("secret has been updated")
-	} else {
-		l.Debug("secret already in actual state")
-	}
-	return nil
+	return p, s, err
 }

@@ -9,9 +9,9 @@ import (
 
 // GopassSecret -
 type GopassSecret struct {
-	secret    *secrets.AKV
-	data      string
-	finalized bool
+	secret      *secrets.AKV
+	attachments map[string]*secrets.AKV
+	data        string
 }
 
 // Set -
@@ -29,7 +29,7 @@ func (gs *GopassSecret) Set(k, v string, fieldType string, sensitivity bool) err
 			return nil
 		}
 		fallthrough
-	case store.SecretTitileField, store.SecretSimpleField:
+	case store.SecretTitleField, store.SecretUsernameField, store.SecretURLField, store.SecretTagsField, store.SecretSimpleField:
 		return gs.secret.Set(k, v)
 	case store.SecretMultilineField:
 		var data string
@@ -39,6 +39,26 @@ func (gs *GopassSecret) Set(k, v string, fieldType string, sensitivity bool) err
 		data += fmt.Sprintf("%s\n\n%s\n", k, v)
 		gs.data += data
 		return gs.write(data)
+	case store.SecretAttachmentField:
+		var err error
+		var secret = secrets.NewAKV()
+		err = secret.Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", k))
+		if err != nil {
+			return err
+		}
+
+		err = secret.Set("Content-Transfer-Encoding", "Base64")
+		if err != nil {
+			return err
+		}
+
+		_, err = secret.Write([]byte(v))
+		if err != nil {
+			return err
+		}
+
+		gs.attachments[k] = secret
+		return nil
 	default:
 		return store.ErrSecretFieldInvalidType
 	}
@@ -52,39 +72,10 @@ func (gs *GopassSecret) write(data string) (err error) {
 	return
 }
 
-// Bytes -
-func (gs *GopassSecret) Bytes() []byte {
-	return gs.secret.Bytes()
-}
-
 // NewEmptyGopassSecret -
 func NewEmptyGopassSecret() *GopassSecret {
 	return &GopassSecret{
-		secret: secrets.NewAKV(),
-		data:   "",
+		secret:      secrets.NewAKV(),
+		attachments: make(map[string]*secrets.AKV),
 	}
-}
-
-// NewAttachmentGopassSecret -
-func NewAttachmentGopassSecret(filename, base64data string) (s *GopassSecret, err error) {
-	s = NewEmptyGopassSecret()
-
-	err = s.Set("Content-Disposition",
-		fmt.Sprintf("attachment; filename=\"%s\"", filename),
-		store.SecretSimpleField, false)
-	if err != nil {
-		return
-	}
-
-	err = s.Set("Content-Transfer-Encoding", "Base64", store.SecretSimpleField, false)
-	if err != nil {
-		return
-	}
-
-	err = s.write(base64data)
-	if err != nil {
-		return
-	}
-
-	return
 }

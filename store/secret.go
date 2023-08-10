@@ -3,10 +3,16 @@ package store
 import "errors"
 
 const (
-	// SecretTitileField - secret field password type
-	SecretTitileField = "title"
+	// SecretTitleField - secret field password type
+	SecretTitleField = "title"
+	// SecretUsernameField -
+	SecretUsernameField = "username"
 	// SecretPasswordField - secret field password type
 	SecretPasswordField = "password"
+	// SecretURLField -
+	SecretURLField = "url"
+	// SecretTagsField -
+	SecretTagsField = "tags"
 	// SecretSimpleField - secret field simple text type
 	SecretSimpleField = "simple"
 	// SecretMultilineField - secret field multiline type
@@ -23,5 +29,4 @@ var (
 // Secret -
 type Secret interface {
 	Set(k, v string, fieldType string, sensitivity bool) error
-	Bytes() []byte
 }

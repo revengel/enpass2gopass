@@ -1,24 +1,20 @@
+// main package
 package main
 
 import (
-	"bytes"
 	"context"
 	"flag"
-	"fmt"
-	"io"
 	"os"
 	"os/signal"
 
 	"github.com/revengel/enpass2gopass/enpass"
 	"github.com/revengel/enpass2gopass/gopassstore"
 	"github.com/revengel/enpass2gopass/store"
-	"github.com/revengel/enpass2gopass/utils"
 	log "github.com/sirupsen/logrus"
 )
 
 var (
-	insertedPaths = utils.NewInsertedPaths()
-	foldersMap    enpass.FoldersMap
+	foldersMap enpass.FoldersMap
 )
 
 func init() {
@@ -72,7 +68,7 @@ func main() {
 		}
 	}()
 
-	gp, err = gopassstore.NewGopass(ctx)
+	gp, err = gopassstore.NewStore(ctx, prefix)
 	if err != nil {
 		log.Fatalf("Failed to connect gopass: %s", err)
 	}
@@ -92,45 +88,26 @@ func main() {
 			l   = log.WithField("type", "item")
 		)
 
-		itemSecrets, err := getGopassItemSecrets(prefix, item)
+		gopassKey, itemSecret, err := getGopassItemSecret(item)
 		if err != nil {
-			l.WithError(err).Fatal("cannot generate gopass secrets")
+			l.WithError(err).Fatal("cannot generate password secret")
 		}
 
-		for key, s := range itemSecrets {
-			var ll = l.WithField("gopassKey", key)
-			ll.Debug("saving secret to gopass store")
+		var ll = l.WithField("gopassKey", gopassKey)
+		ll.Debug("saving secret to password store")
 
-			if log.GetLevel() >= log.DebugLevel {
-				// output data secrets
-				fmt.Println()
-				reader := bytes.NewReader(s.Bytes())
-				io.Copy(os.Stdout, reader)
-			}
-
-			err = gopassSaveSecret(s, gp, key, dryrun, ll)
-			if err != nil {
-				ll.WithError(err).Fatal("cannot save secret")
-			}
-		}
-	}
-
-	var lc = log.WithField("type", "cleaner")
-	ll, err := gp.List(`^` + prefix + `/`)
-	if err != nil {
-		lc.WithError(err).Fatal("cannot get gopass keys list")
-	}
-
-	for _, k := range ll {
-		if c := insertedPaths.Check(k); c > 0 {
+		if dryrun {
 			continue
 		}
 
-		var lck = lc.WithField("gopassPath", k)
-		lck.Info("gopass key will be deleted")
-		err = gp.Remove(k)
+		_, err = gp.Save(itemSecret, gopassKey)
 		if err != nil {
-			lck.Fatal("cannot delete gopass key")
+			ll.WithError(err).Fatal("cannot save secret")
 		}
+	}
+
+	_, err = gp.Cleanup()
+	if err != nil {
+		log.WithError(err).Fatal("cannot cleanup passwords storage")
 	}
 }

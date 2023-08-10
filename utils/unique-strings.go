@@ -7,6 +7,16 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// HasInterface -
+type HasInterface interface {
+	Has(s string) bool
+}
+
+// UniqueInterface -
+type UniqueInterface interface {
+	Unique(s string) string
+}
+
 // UniqueStrings -
 type UniqueStrings struct {
 	sync.Mutex
