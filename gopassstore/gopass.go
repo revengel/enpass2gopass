@@ -1,9 +1,12 @@
 package gopassstore
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"regexp"
 
@@ -11,7 +14,7 @@ import (
 	"github.com/gopasspw/gopass/pkg/gopass/api"
 	"github.com/revengel/enpass2gopass/store"
 	"github.com/revengel/enpass2gopass/utils"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -21,10 +24,13 @@ var (
 
 // Gopass -
 type Gopass struct {
-	ctx    context.Context
-	api    *api.Gopass
-	prefix string
-	items  *utils.UniqueStrings
+	ctx            context.Context
+	api            *api.Gopass
+	prefix         string
+	uniqueKeys     *utils.UniqueStrings
+	uniquePrefixes *utils.UniqueStrings
+	dryrun         bool
+	logger         *logrus.Logger
 }
 
 // Get -
@@ -76,32 +82,32 @@ func (g Gopass) diff(a, b gopass.Byter) bool {
 	return ahash == bhash
 }
 
-// DiffWithStorage -
-func (g Gopass) diffWithStorage(s gopass.Byter, p string) (bool, error) {
-	rSec, err := g.get(p)
-	if err != nil {
-		// TODO: need be refactoring
-		if err.Error() == ErrNotFound.Error() {
-			return false, nil
-		}
-		return false, err
-	}
-
-	return g.diff(s, rSec), nil
-}
-
 func (g Gopass) saveSecret(s gopass.Byter, p string) (bool, error) {
-	p = g.items.Unique(p)
-	var l = log.WithField("gopasskey", p)
+	p = g.uniqueKeys.Unique(p)
+	var l = g.logger.WithField("gopasskey", p)
 
-	same, err := g.diffWithStorage(s, p)
-	if err != nil {
+	rSec, err := g.get(p)
+	if err != nil && err.Error() != ErrNotFound.Error() {
 		return false, err
 	}
 
-	if same {
+	if rSec != nil && g.diff(s, rSec) {
 		l.Debug("gopass secret already in actual state")
 		return false, nil
+	}
+
+	l.Info("secret will be updated")
+	if g.logger.IsLevelEnabled(logrus.DebugLevel) {
+		fmt.Println("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+		if rSec != nil {
+			io.Copy(os.Stdout, bytes.NewReader(rSec.Bytes()))
+		}
+		fmt.Println("=============")
+		io.Copy(os.Stdout, bytes.NewReader(s.Bytes()))
+	}
+
+	if g.dryrun {
+		return true, nil
 	}
 
 	err = g.set(s, p)
@@ -122,14 +128,19 @@ func (g Gopass) Cleanup() (bool, error) {
 	}
 
 	for _, k := range ll {
-		if g.items.Has(k) {
+		if g.uniqueKeys.Has(k) {
 			continue
 		}
 
-		var lc = log.WithField("type", "cleaner").
+		var lc = g.logger.WithField("type", "cleaner").
 			WithField("gopasskey", k)
 
 		lc.Info("gopass key will be deleted")
+
+		if g.dryrun {
+			continue
+		}
+
 		err = g.remove(k)
 		if err != nil {
 			return false, err
@@ -151,15 +162,22 @@ func (g Gopass) getAttachmentSecretPath(p, attachmentName string) string {
 
 // Save -
 func (g Gopass) Save(s store.Secret, p string) (bool, error) {
+	p = g.uniquePrefixes.Unique(p)
 	var keyPath = g.getMainSecretPath(p)
 	var out bool
 	var secret *GopassSecret
+	var err error
 
 	switch v := s.(type) {
 	case *GopassSecret:
 		secret = v
 	default:
 		return false, errors.New("secret must be *GopassSecret")
+	}
+
+	err = secret.finalize()
+	if err != nil {
+		return out, err
 	}
 
 	same, err := g.saveSecret(secret.secret, keyPath)
@@ -182,13 +200,8 @@ func (g Gopass) Save(s store.Secret, p string) (bool, error) {
 	return out, nil
 }
 
-// Sync -
-func (g Gopass) Sync() error {
-	return g.api.Sync(g.ctx)
-}
-
 // NewStore -
-func NewStore(ctx context.Context, prefix string) (g *Gopass, err error) {
+func NewStore(ctx context.Context, prefix string, dryrun bool, logger *logrus.Logger) (g *Gopass, err error) {
 	var gp *api.Gopass
 	gp, err = api.New(ctx)
 	if err != nil {
@@ -200,9 +213,12 @@ func NewStore(ctx context.Context, prefix string) (g *Gopass, err error) {
 	}
 
 	return &Gopass{
-		ctx:    ctx,
-		api:    gp,
-		prefix: prefix,
-		items:  utils.NewUniqueStrings(),
+		ctx:            ctx,
+		api:            gp,
+		prefix:         prefix,
+		uniqueKeys:     utils.NewUniqueStrings(logger),
+		uniquePrefixes: utils.NewUniqueStrings(logger),
+		dryrun:         dryrun,
+		logger:         logger,
 	}, nil
 }

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/revengel/enpass2gopass/utils"
+	"github.com/sirupsen/logrus"
 	"github.com/tobischo/gokeepasslib/v3"
 )
 
@@ -13,6 +14,8 @@ type Store struct {
 	db     *gokeepasslib.Database
 	prefix string
 	items  *utils.UniqueStrings
+	dryrun bool
+	logger *logrus.Logger
 }
 
 // Close -
@@ -30,13 +33,8 @@ func (st *Store) Save(s Secret, p string) (bool, error) {
 	return false, nil
 }
 
-// Sync -
-func (st *Store) Sync() error {
-	return nil
-}
-
 // NewStore -
-func NewStore(dbPath, password, prefix string) (store *Store, err error) {
+func NewStore(dbPath, password, prefix string, dryrun bool, logger *logrus.Logger) (store *Store, err error) {
 	absDbPath, err := filepath.Abs(dbPath)
 	if err != nil {
 		return
@@ -61,6 +59,8 @@ func NewStore(dbPath, password, prefix string) (store *Store, err error) {
 	return &Store{
 		db:     db,
 		prefix: prefix,
-		items:  utils.NewUniqueStrings(),
+		items:  utils.NewUniqueStrings(logger),
+		dryrun: dryrun,
+		logger: logger,
 	}, nil
 }

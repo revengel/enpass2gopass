@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // HasInterface -
@@ -22,6 +22,7 @@ type UniqueStrings struct {
 	sync.Mutex
 	counts map[string]uint64
 	unique map[string]uint64
+	logger *logrus.Logger
 }
 
 // Unique -
@@ -36,7 +37,7 @@ func (u *UniqueStrings) Unique(s string) string {
 	if v, ok := u.counts[hash]; ok {
 		val = v + 1
 		out = fmt.Sprintf("%s_%d", s, val)
-		log.Warnf("string '%s' will be rename to '%s'", s, out)
+		u.logger.Warnf("string '%s' will be rename to '%s'", s, out)
 	}
 
 	u.counts[hash] = val
@@ -54,9 +55,10 @@ func (u *UniqueStrings) Has(s string) bool {
 }
 
 // NewUniqueStrings -
-func NewUniqueStrings() *UniqueStrings {
+func NewUniqueStrings(logger *logrus.Logger) *UniqueStrings {
 	return &UniqueStrings{
 		counts: make(map[string]uint64),
 		unique: make(map[string]uint64),
+		logger: logger,
 	}
 }

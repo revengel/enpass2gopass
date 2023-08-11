@@ -5,21 +5,21 @@ import (
 	"path/filepath"
 
 	"github.com/revengel/enpass2gopass/enpass"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 func setLogLevel(level string, debug bool) (err error) {
 	if debug {
-		log.SetLevel(log.DebugLevel)
+		logger.SetLevel(logrus.DebugLevel)
 		return
 	}
 
-	lvl, err := log.ParseLevel(level)
+	lvl, err := logrus.ParseLevel(level)
 	if err != nil {
 		return
 	}
 
-	log.SetLevel(lvl)
+	logger.SetLevel(lvl)
 	return
 }
 

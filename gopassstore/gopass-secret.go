@@ -12,6 +12,7 @@ type GopassSecret struct {
 	secret      *secrets.AKV
 	attachments map[string]*secrets.AKV
 	data        string
+	finalized   bool
 }
 
 // Set -
@@ -32,13 +33,11 @@ func (gs *GopassSecret) Set(k, v string, fieldType string, sensitivity bool) err
 	case store.SecretTitleField, store.SecretUsernameField, store.SecretURLField, store.SecretTagsField, store.SecretSimpleField:
 		return gs.secret.Set(k, v)
 	case store.SecretMultilineField:
-		var data string
 		if gs.data == "" {
-			data += "---\n"
+			gs.data += "---\n"
 		}
-		data += fmt.Sprintf("%s\n\n%s\n", k, v)
-		gs.data += data
-		return gs.write(data)
+		gs.data += fmt.Sprintf("%s\n\n%s\n", k, v)
+		return nil
 	case store.SecretAttachmentField:
 		var err error
 		var secret = secrets.NewAKV()
@@ -70,6 +69,20 @@ func (gs *GopassSecret) write(data string) (err error) {
 		return err
 	}
 	return
+}
+
+func (gs *GopassSecret) finalize() (err error) {
+	if gs.finalized {
+		return
+	}
+
+	err = gs.write(gs.data)
+	if err != nil {
+		return err
+	}
+
+	gs.finalized = true
+	return nil
 }
 
 // NewEmptyGopassSecret -
