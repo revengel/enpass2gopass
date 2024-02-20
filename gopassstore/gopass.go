@@ -3,7 +3,6 @@ package gopassstore
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,7 +11,8 @@ import (
 
 	"github.com/gopasspw/gopass/pkg/gopass"
 	"github.com/gopasspw/gopass/pkg/gopass/api"
-	"github.com/revengel/enpass2gopass/store"
+	"github.com/gopasspw/gopass/pkg/gopass/secrets"
+	"github.com/revengel/enpass2gopass/field"
 	"github.com/revengel/enpass2gopass/utils"
 	"github.com/sirupsen/logrus"
 )
@@ -161,33 +161,77 @@ func (g Gopass) getAttachmentSecretPath(p, attachmentName string) string {
 }
 
 // Save -
-func (g Gopass) Save(s store.Secret, p string) (bool, error) {
+func (g Gopass) Save(fields []field.FieldInterface, p string) (bool, error) {
+	var err error
+	var out bool
 	p = g.uniquePrefixes.Unique(p)
 	var keyPath = g.getMainSecretPath(p)
-	var out bool
-	var secret *GopassSecret
-	var err error
 
-	switch v := s.(type) {
-	case *GopassSecret:
-		secret = v
-	default:
-		return false, errors.New("secret must be *GopassSecret")
+	// create gopass secrets
+	var mainSecret = secrets.NewAKV()
+	var attachments = make(map[string]*secrets.AKV)
+	var multilineFields []field.FieldInterface
+	for _, f := range fields {
+		switch f.GetType() {
+		case field.SecretAttachmentField:
+			// create separate secrets for attachments
+			var secret = secrets.NewAKV()
+			err = secret.Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", f.GetKey()))
+			if err != nil {
+				return false, err
+			}
+
+			err = secret.Set("Content-Transfer-Encoding", "Base64")
+			if err != nil {
+				return false, err
+			}
+
+			_, err = secret.Write(f.GetValue())
+			if err != nil {
+				return false, err
+			}
+
+			attachments[f.GetKey()] = secret
+		case field.SecretPasswordField:
+			// SetPassword -
+			if mainSecret.Password() == "" {
+				mainSecret.SetPassword(f.GetValueString())
+				continue
+			}
+			fallthrough
+		default:
+			if f.IsMultiline() {
+				multilineFields = append(multilineFields, f)
+				continue
+			}
+			err = mainSecret.Set(f.GetKey(), f.GetValueString())
+			if err != nil {
+				return false, nil
+			}
+		}
 	}
 
-	err = secret.finalize()
-	if err != nil {
-		return out, err
+	// writing multiline fields in end of decret
+	if len(multilineFields) > 0 {
+		var data = "---\n"
+		for _, f := range multilineFields {
+			data += fmt.Sprintf("%s\n\n%s\n", f.GetKey(), f.GetValueString())
+		}
+
+		_, err = mainSecret.Write([]byte(data))
+		if err != nil {
+			return false, nil
+		}
 	}
 
-	same, err := g.saveSecret(secret.secret, keyPath)
+	same, err := g.saveSecret(mainSecret, keyPath)
 	if err != nil {
 		return out, err
 	}
 
 	out = out || same
 
-	for attachName, secret := range secret.attachments {
+	for attachName, secret := range attachments {
 		var keyPath = g.getAttachmentSecretPath(p, attachName)
 		same, err := g.saveSecret(secret, keyPath)
 		if err != nil {

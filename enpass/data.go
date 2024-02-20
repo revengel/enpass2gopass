@@ -2,7 +2,7 @@ package enpass
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -44,7 +44,7 @@ func LoadData(dataPath string) (d Data, err error) {
 
 	defer jsonFile.Close()
 
-	b, err := ioutil.ReadAll(jsonFile)
+	b, err := io.ReadAll(jsonFile)
 	if err != nil {
 		return
 	}
@@ -53,6 +53,15 @@ func LoadData(dataPath string) (d Data, err error) {
 	if err != nil {
 		return
 	}
+
+	var foldersMap = d.GetFoldersMap()
+	var items []DataItem
+	for _, item := range d.Items {
+		var folders = foldersMap.GetFolders(item.Folders)
+		item.Folders = folders
+		items = append(items, item)
+	}
+	d.Items = items
 
 	return
 }

@@ -14,8 +14,7 @@ import (
 )
 
 var (
-	foldersMap enpass.FoldersMap
-	logger     = logrus.New()
+	logger = logrus.New()
 )
 
 func init() {
@@ -81,21 +80,24 @@ func main() {
 		logger.Fatalf("Cannot load data from json file: %s", err.Error())
 	}
 
-	foldersMap = data.GetFoldersMap()
-
 	for _, item := range data.Items {
 		var (
 			err error
 			l   = logger.WithField("type", "item")
 		)
 
-		gopassKey, itemSecret, err := getGopassItemSecret(item)
+		gopassPath, err := gopassstore.GetSecretPath(item)
 		if err != nil {
-			l.WithError(err).Fatal("cannot generate password secret")
+			logger.WithError(err).Fatal("cannot get gopass path")
 		}
 
-		var ll = l.WithField("gopassKey", gopassKey)
-		_, err = gp.Save(itemSecret, gopassKey)
+		var ll = l.WithField("gopassKey", gopassPath)
+		fields, err := item.GetFields()
+		if err != nil {
+			ll.WithError(err).Fatal("cannot get item fields")
+		}
+
+		_, err = gp.Save(fields, gopassPath)
 		if err != nil {
 			ll.WithError(err).Fatal("cannot save secret")
 		}
