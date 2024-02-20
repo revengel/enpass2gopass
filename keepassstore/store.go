@@ -19,6 +19,7 @@ type Store struct {
 	items  *utils.UniqueStrings
 	dryrun bool
 	logger *logrus.Logger
+	file   *os.File
 }
 
 // Close -
@@ -31,46 +32,22 @@ func (st *Store) Cleanup() (bool, error) {
 	return false, nil
 }
 
-// Creates recursive groups under a given parent group
-func (st *Store) createRecursiveGroups(parentGroup *gokeepasslib.Group, groups []string) *gokeepasslib.Group {
-	if len(groups) <= 0 {
-		return parentGroup
-	}
-
-	for _, g := range parentGroup.Groups {
-		if g.Name == groups[0] {
-			return st.createRecursiveGroups(&g, groups[1:])
+func (st *Store) createGroupRecursive(group *gokeepasslib.Group, path []string) *gokeepasslib.Group {
+	for _, g := range group.Groups {
+		if g.Name == path[0] {
+			return st.createGroupRecursive(&g, path[1:])
 		}
 	}
 
-	// Create a new group
-	group := gokeepasslib.NewGroup()
-	group.Name = groups[0]
-
-	// Add the group to the parent group
-	parentGroup.Groups = append(parentGroup.Groups, group)
-	return st.createRecursiveGroups(&group, groups[1:])
+	var sg = gokeepasslib.NewGroup()
+	sg.Name = path[0]
+	group.Groups = append(group.Groups, sg)
+	return st.createGroupRecursive(&sg, path[1:])
 }
 
 // Save -
 func (st *Store) Save(fields []field.FieldInterface, p string) (bool, error) {
-	dir := filepath.Dir(p)
-	groups := strings.Split(dir, "/")
-	var root *gokeepasslib.Group
-
-	var exists bool
-	for i, g := range st.db.Content.Root.Groups {
-		if g.Name == st.prefix {
-			root = &st.db.Content.Root.Groups[i]
-			exists = true
-		}
-	}
-
-	if !exists {
-		group := gokeepasslib.NewGroup()
-		group.Name = st.prefix
-	}
-
+	var err error
 	var mainSecret = NewSecret()
 	var attachments []field.FieldInterface
 	for _, f := range fields {
@@ -86,7 +63,7 @@ func (st *Store) Save(fields []field.FieldInterface, p string) (bool, error) {
 		case field.SecretTagsField:
 			mainSecret.setKeyOrAlt("Tags", f.GetKey(), f.GetValueString(), false)
 		case field.SecretAttachmentField:
-			attachments = append(attachments, f)
+			_ = append(attachments, f)
 		default:
 			if f.IsMultiline() {
 				var notes = mainSecret.GetContent("Notes")
@@ -96,6 +73,38 @@ func (st *Store) Save(fields []field.FieldInterface, p string) (bool, error) {
 			}
 			mainSecret.setKey(f.GetKey(), f.GetValueString(), f.IsSensitive())
 		}
+	}
+
+	var secretPath = filepath.Join(st.prefix, p)
+	// Split the group path into individual levels
+	groupLevels := strings.Split(secretPath, "/")
+
+	// Start from the root group
+	var rootGroup *gokeepasslib.Group
+	for _, gr := range st.db.Content.Root.Groups {
+		if gr.Name == groupLevels[0] {
+			rootGroup = &gr
+			break
+		}
+	}
+
+	if rootGroup == nil {
+		gr := gokeepasslib.NewGroup()
+		gr.Name = groupLevels[0]
+		rootGroup = &gr
+		st.db.Content.Root.Groups = append(st.db.Content.Root.Groups, *rootGroup)
+	}
+
+	// Create the groups with the specified path recursively
+	lastGroup := st.createGroupRecursive(rootGroup, groupLevels[1:])
+	lastGroup.Entries = append(lastGroup.Entries, mainSecret.Entry)
+
+	defer st.db.LockProtectedEntries()
+
+	encoder := gokeepasslib.NewEncoder(st.file)
+	err = encoder.Encode(st.db)
+	if err != nil {
+		return false, err
 	}
 
 	return false, nil

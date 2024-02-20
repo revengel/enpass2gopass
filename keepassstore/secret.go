@@ -10,7 +10,7 @@ type Secret struct {
 	gokeepasslib.Entry
 }
 
-func (s Secret) setKey(k, v string, sensitivity bool) error {
+func (s Secret) setKey(k, v string, sensitivity bool) {
 	s.Values = append(s.Values, gokeepasslib.ValueData{
 		Key: k,
 		Value: gokeepasslib.V{
@@ -18,14 +18,14 @@ func (s Secret) setKey(k, v string, sensitivity bool) error {
 			Protected: wrappers.NewBoolWrapper(sensitivity),
 		},
 	})
-	return nil
 }
 
-func (s Secret) setKeyOrAlt(k, altK, v string, sensitivity bool) error {
+func (s Secret) setKeyOrAlt(k, altK, v string, sensitivity bool) {
 	if t := s.GetContent(k); t == "" {
-		return s.setKey(k, v, sensitivity)
+		s.setKey(k, v, sensitivity)
+		return
 	}
-	return s.setKey(altK, v, sensitivity)
+	s.setKey(altK, v, sensitivity)
 }
 
 // NewSecret -

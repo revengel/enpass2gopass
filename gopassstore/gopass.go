@@ -100,10 +100,16 @@ func (g Gopass) saveSecret(s gopass.Byter, p string) (bool, error) {
 	if g.logger.IsLevelEnabled(logrus.DebugLevel) {
 		fmt.Println("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
 		if rSec != nil {
-			io.Copy(os.Stdout, bytes.NewReader(rSec.Bytes()))
+			_, err = io.Copy(os.Stdout, bytes.NewReader(rSec.Bytes()))
+			if err != nil {
+				return false, err
+			}
 		}
 		fmt.Println("=============")
-		io.Copy(os.Stdout, bytes.NewReader(s.Bytes()))
+		_, err = io.Copy(os.Stdout, bytes.NewReader(s.Bytes()))
+		if err != nil {
+			return false, err
+		}
 	}
 
 	if g.dryrun {
