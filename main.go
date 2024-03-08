@@ -7,9 +7,9 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/revengel/enpass2gopass/enpass"
-	"github.com/revengel/enpass2gopass/gopassstore"
 	"github.com/revengel/enpass2gopass/store"
+	"github.com/revengel/enpass2gopass/store/enpass"
+	"github.com/revengel/enpass2gopass/store/gopass"
 	"github.com/sirupsen/logrus"
 )
 
@@ -32,7 +32,7 @@ func main() {
 		prefix        string
 		logLevel      string
 		dryrun, debug bool
-		gp            store.Store
+		gp            store.StoreDestination
 		err           error
 	)
 
@@ -68,7 +68,7 @@ func main() {
 		}
 	}()
 
-	gp, err = gopassstore.NewStore(ctx, prefix, dryrun, logger)
+	gp, err = gopass.NewStore(ctx, prefix, dryrun, logger)
 	if err != nil {
 		logger.Fatalf("Failed to connect gopass: %s", err)
 	}
@@ -86,7 +86,7 @@ func main() {
 			l   = logger.WithField("type", "item")
 		)
 
-		gopassPath, err := gopassstore.GetSecretPath(item)
+		gopassPath, err := gopass.GetSecretPath(item)
 		if err != nil {
 			logger.WithError(err).Fatal("cannot get gopass path")
 		}

@@ -1,4 +1,4 @@
-package keepassstore
+package keepass
 
 import (
 	"fmt"

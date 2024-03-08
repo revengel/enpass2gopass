@@ -1,4 +1,4 @@
-package gopassstore
+package gopass
 
 import (
 	"errors"
