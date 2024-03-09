@@ -1,7 +1,9 @@
 package enpass
 
 import (
+	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/revengel/enpass2gopass/field"
@@ -94,7 +96,7 @@ func (i DataItem) GetFields() (out []field.FieldInterface, err error) {
 	out = append(out, field.NewUsernameField("subtitle", i.GetSubtitle()))
 
 	out = append(out, field.NewSimpleField("category", []byte(i.GetCategoryPath()), false, false))
-	out = append(out, field.NewSimpleField("note", []byte(i.GetCategoryPath()), true, false))
+	out = append(out, field.NewSimpleField("note", []byte(i.GetNote()), true, false))
 
 	out = append(out, field.NewTagsField("", i.GetFoldersStr()))
 
@@ -158,4 +160,34 @@ func (i DataItem) GetFields() (out []field.FieldInterface, err error) {
 	}
 
 	return
+}
+
+func (i DataItem) GetSecretPath() (out string, err error) {
+	var folder = i.GetFirstFolder()
+	switch {
+	case i.IsTrashed():
+		out = filepath.Join(out, "trash")
+	case i.IsArchived():
+		out = filepath.Join(out, "archive")
+	case i.IsFavorite():
+		out = filepath.Join(out, "favorite")
+	}
+
+	var cat = i.GetCategoryPath()
+	if cat == "" {
+		return "", errors.New("category cannot be empty")
+	}
+	out = filepath.Join(out, cat)
+
+	if folder != "" {
+		out = filepath.Join(out, folder)
+	}
+
+	var title = i.GetTitlePath()
+	if title == "" {
+		return "", errors.New("title cannot be empty")
+	}
+	out = filepath.Join(out, title)
+
+	return out, nil
 }

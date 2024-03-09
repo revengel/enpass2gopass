@@ -99,7 +99,9 @@ func (st *Store) Save(fields []field.FieldInterface, p string) (bool, error) {
 	lastGroup := st.createGroupRecursive(rootGroup, groupLevels[1:])
 	lastGroup.Entries = append(lastGroup.Entries, mainSecret.Entry)
 
-	defer st.db.LockProtectedEntries()
+	defer func() {
+		err = st.db.LockProtectedEntries()
+	}()
 
 	encoder := gokeepasslib.NewEncoder(st.file)
 	err = encoder.Encode(st.db)

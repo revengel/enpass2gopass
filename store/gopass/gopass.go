@@ -219,8 +219,14 @@ func (g Gopass) Save(fields []field.FieldInterface, p string) (bool, error) {
 
 	// writing multiline fields in end of decret
 	if len(multilineFields) > 0 {
-		var data = "---\n"
+		var data string
 		for _, f := range multilineFields {
+			if f.GetValueString() == "" {
+				continue
+			}
+			if data == "" {
+				data = "---\n"
+			}
 			data += fmt.Sprintf("%s\n\n%s\n", f.GetKey(), f.GetValueString())
 		}
 

@@ -11,5 +11,11 @@ type StoreDestination interface {
 
 // StoreSource -
 type StoreSource interface {
-	LoadData() (err error)
+	LoadData() (o []StoreSourceItem, err error)
+}
+
+// StoreSourceItem -
+type StoreSourceItem interface {
+	GetSecretPath() (string, error)
+	GetFields() (o []field.FieldInterface, err error)
 }

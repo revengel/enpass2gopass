@@ -3,18 +3,16 @@ package main
 
 import (
 	"context"
-	"flag"
 	"os"
 	"os/signal"
 
-	"github.com/revengel/enpass2gopass/store"
-	"github.com/revengel/enpass2gopass/store/enpass"
-	"github.com/revengel/enpass2gopass/store/gopass"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 )
 
 var (
-	logger = logrus.New()
+	logger  = logrus.New()
+	version string
 )
 
 func init() {
@@ -28,30 +26,7 @@ func init() {
 }
 
 func main() {
-	var (
-		prefix        string
-		logLevel      string
-		dryrun, debug bool
-		gp            store.StoreDestination
-		err           error
-	)
-
-	flag.StringVar(&prefix, "prefix", "enpass", "gopass path prefix")
-	flag.StringVar(&logLevel, "log-level", logrus.InfoLevel.String(), "log level")
-	flag.BoolVar(&dryrun, "dry-run", false, "do not write changes to gopass")
-	flag.BoolVar(&debug, "debug", false, "enable debug log level")
-	flag.Parse()
-
-	err = setLogLevel(logLevel, debug)
-	if err != nil {
-		logger.Fatalf("Cannot set log level format '%s': %s", logLevel, err.Error())
-	}
-
-	values := flag.Args()
-	if len(values) == 0 {
-		logger.Fatal("Need to set path to json file with data")
-	}
-
+	var err error
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 	sigChan := make(chan os.Signal, 1)
@@ -68,43 +43,48 @@ func main() {
 		}
 	}()
 
-	gp, err = gopass.NewStore(ctx, prefix, dryrun, logger)
-	if err != nil {
-		logger.Fatalf("Failed to connect gopass: %s", err)
+	a := &app{
+		ctx:    ctx,
+		logger: logger,
 	}
 
-	defer gp.Close()
+	defer a.Close()
 
-	data, err := enpass.LoadData(values[0])
-	if err != nil {
-		logger.Fatalf("Cannot load data from json file: %s", err.Error())
+	rootCmd := &cobra.Command{
+		Use:   "enpass2gopass",
+		Short: `enpass to gopass importer`,
 	}
 
-	for _, item := range data.Items {
-		var (
-			err error
-			l   = logger.WithField("type", "item")
-		)
+	rootCmd.PersistentFlags().StringP("log-level", "", logrus.InfoLevel.String(), "log level")
+	rootCmd.PersistentFlags().BoolP("debug", "", false, "enable debug log level")
 
-		gopassPath, err := gopass.GetSecretPath(item)
-		if err != nil {
-			logger.WithError(err).Fatal("cannot get gopass path")
-		}
-
-		var ll = l.WithField("gopassKey", gopassPath)
-		fields, err := item.GetFields()
-		if err != nil {
-			ll.WithError(err).Fatal("cannot get item fields")
-		}
-
-		_, err = gp.Save(fields, gopassPath)
-		if err != nil {
-			ll.WithError(err).Fatal("cannot save secret")
-		}
+	versionCmd := &cobra.Command{
+		Use:     "version",
+		Short:   "show version",
+		Aliases: []string{"ver"},
+		Run: func(cmd *cobra.Command, args []string) {
+			cmd.Println(getVersion().String())
+		},
 	}
 
-	_, err = gp.Cleanup()
+	importCmd := &cobra.Command{
+		Use:     "import",
+		Short:   "Import command",
+		Aliases: []string{},
+		PreRunE: a.Before,
+		RunE:    a.Import,
+	}
+
+	importCmd.PersistentFlags().StringP("prefix", "", "", "destination storage path prefix")
+	importCmd.PersistentFlags().BoolP("dry-run", "", false, "do not make changes")
+	importCmd.PersistentFlags().StringP("source-provider", "", EnpassJsonSourceType, "source provider")
+	importCmd.PersistentFlags().StringP("source-enpass-json-path", "", "", "source enpass json path")
+	importCmd.PersistentFlags().StringP("destination-provider", "", GopassDestinationType, "destination provider")
+
+	rootCmd.AddCommand(versionCmd, importCmd)
+
+	err = rootCmd.ExecuteContext(ctx)
 	if err != nil {
-		logger.WithError(err).Fatal("cannot cleanup passwords storage")
+		logger.Fatalf("cannot run root command: %s", err.Error())
 	}
 }
