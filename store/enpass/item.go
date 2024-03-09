@@ -92,13 +92,30 @@ func (i DataItem) GetFoldersStr() string {
 
 // GetFields -
 func (i DataItem) GetFields() (out []field.FieldInterface, err error) {
-	out = append(out, field.NewTitleField("", i.GetTitle()))
-	out = append(out, field.NewUsernameField("subtitle", i.GetSubtitle()))
+	if v := i.GetTitle(); v != "" {
+		f := field.NewTitleField("", v)
+		out = append(out, f)
+	}
 
-	out = append(out, field.NewSimpleField("category", []byte(i.GetCategoryPath()), false, false))
-	out = append(out, field.NewSimpleField("note", []byte(i.GetNote()), true, false))
+	if v := i.GetSubtitle(); v != "" {
+		f := field.NewUsernameField("subtitle", v)
+		out = append(out, f)
+	}
 
-	out = append(out, field.NewTagsField("", i.GetFoldersStr()))
+	if v := i.GetCategoryPath(); v != "" {
+		f := field.NewSimpleField("category", []byte(v), false, false)
+		out = append(out, f)
+	}
+
+	if v := i.GetNote(); v != "" {
+		f := field.NewSimpleField("note", []byte(v), true, false)
+		out = append(out, f)
+	}
+
+	if v := i.GetFoldersStr(); v != "" {
+		f := field.NewTagsField("", v)
+		out = append(out, f)
+	}
 
 	for _, f := range i.Fields {
 		var ignoreTypes = []string{"section", ".Android#"}

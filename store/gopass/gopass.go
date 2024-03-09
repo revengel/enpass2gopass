@@ -210,6 +210,11 @@ func (g Gopass) Save(fields []field.FieldInterface, p string) (bool, error) {
 				multilineFields = append(multilineFields, f)
 				continue
 			}
+
+			if v := f.GetValueString(); v == "" {
+				continue
+			}
+
 			err = mainSecret.Set(f.GetKey(), f.GetValueString())
 			if err != nil {
 				return false, nil
